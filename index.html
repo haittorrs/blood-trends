@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Blood Trends</title>
+<meta name="description" content="Private, on-device blood test tracker">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Blood Trends">
+<meta name="theme-color" content="#F5F7F8">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+:root{
+  --bg:#F5F7F8; --surface:#FFFFFF; --ink:#16262E; --muted:#5B6B73; --line:#E2E8EA;
+  --teal:#0E7490; --teal-ink:#0B5C73; --band:rgba(14,116,144,.08);
+  --alert:#B3261E; --alert-bg:#FBEDEC; --ok:#1B7A4B; --warn:#9A6700;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.hidden{display:none!important}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px 48px}
+header.app{position:sticky;top:0;z-index:5;background:rgba(245,247,248,.92);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header.app .bar{max-width:520px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:12px 16px}
+.brand{font-weight:800;letter-spacing:-.02em;font-size:1.05rem}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
+.spacer{flex:1}
+button{font-family:var(--sans);border:none;background:none;color:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;
+  padding:13px 18px;font-size:.95rem;font-weight:600;width:100%;transition:opacity .15s}
+.btn:active{opacity:.7}
+.btn-primary{background:var(--teal);color:#fff}
+.btn-ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.btn-danger{background:var(--alert-bg);color:var(--alert)}
+.btn-small{width:auto;padding:8px 14px;font-size:.85rem;border-radius:10px}
+.icon-btn{width:38px;height:38px;border-radius:10px;background:var(--surface);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:1rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:14px}
+h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:22px 0 4px}
+h2{font-size:1.05rem;font-weight:700;margin-bottom:10px}
+.sub{color:var(--muted);font-size:.88rem;line-height:1.45}
+.eyebrow{font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--teal-ink);margin-top:24px}
+/* Lock screen */
+#lockView{display:flex;flex-direction:column;justify-content:center;min-height:88vh;max-width:400px;margin:0 auto;padding:0 24px}
+.lock-mark{width:64px;height:64px;border-radius:18px;background:var(--teal);margin:0 auto 18px;
+  display:flex;align-items:center;justify-content:center}
+.lock-mark svg{width:34px;height:34px}
+#lockView h1{text-align:center;margin-top:0}
+#lockView .sub{text-align:center;margin-bottom:22px}
+.pin-field{width:100%;font-family:var(--mono);font-size:1.5rem;letter-spacing:.4em;text-align:center;
+  padding:14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:12px;color:var(--ink)}
+.pin-field:focus{outline:none;border-color:var(--teal)}
+.err{color:var(--alert);font-size:.85rem;text-align:center;min-height:1.2em;margin-bottom:10px}
+/* Marker cards */
+.marker-grid{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.marker-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.marker-card:active{background:#EEF3F4}
+.mc-name{font-weight:600;font-size:.93rem}
+.mc-range{color:var(--muted);font-size:.72rem;font-family:var(--mono);margin-top:2px}
+.mc-value{margin-left:auto;text-align:right}
+.mc-value .v{font-family:var(--mono);font-weight:700;font-size:1.12rem;font-variant-numeric:tabular-nums}
+.mc-value .u{color:var(--muted);font-size:.7rem;font-family:var(--mono)}
+.flag{color:var(--alert)}
+.trend-chip{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;
+  padding:3px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.trend-chip.up .arr{color:var(--teal-ink)} .trend-chip.down .arr{color:var(--teal-ink)}
+/* Detail */
+.range-note{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:2px}
+.chart-box{margin-top:14px}
+.chart-box svg{width:100%;height:auto;display:block}
+.hist{margin-top:8px}
+.hist-row{display:flex;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid var(--line);font-size:.9rem}
+.hist-row:last-child{border-bottom:none}
+.hist-date{font-family:var(--mono);color:var(--muted);font-size:.82rem;min-width:98px}
+.hist-val{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums}
+.hist-flag{font-size:.7rem;font-weight:700;color:var(--alert);background:var(--alert-bg);
+  padding:2px 8px;border-radius:999px}
+.hist-del{margin-left:auto;color:var(--muted);font-size:.8rem;padding:6px}
+/* Review table */
+.rev-row{display:grid;grid-template-columns:1fr 84px 34px;gap:8px;margin-bottom:8px;align-items:center}
+.rev-row select,.rev-row input,input[type=date],select.plain{width:100%;padding:10px;border:1.5px solid var(--line);
+  border-radius:10px;background:var(--surface);font-size:.88rem;color:var(--ink);font-family:var(--sans)}
+.rev-row input.val{font-family:var(--mono);text-align:right}
+.rev-row .rm{color:var(--muted);font-size:1.1rem;text-align:center}
+.rev-custom{grid-column:1/-1;display:none}
+.badge-new{font-size:.66rem;font-weight:700;color:var(--teal-ink);background:var(--band);
+  padding:2px 7px;border-radius:999px;margin-left:6px}
+/* Settings rows */
+.set-row{display:flex;align-items:center;gap:10px;padding:13px 2px;border-bottom:1px solid var(--line);font-size:.92rem}
+.set-row:last-child{border-bottom:none}
+.set-sub{color:var(--muted);font-size:.78rem;margin-top:2px}
+.report-src{font-family:var(--mono);font-size:.75rem;color:var(--muted);word-break:break-all}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:11px 18px;border-radius:12px;font-size:.88rem;z-index:50;max-width:88vw;text-align:center}
+.disclaimer{color:var(--muted);font-size:.75rem;line-height:1.5;margin-top:26px;padding:0 4px}
+.progress{font-family:var(--mono);font-size:.85rem;color:var(--teal-ink);margin-top:10px}
+.empty{ text-align:center;padding:36px 20px;color:var(--muted);font-size:.9rem;line-height:1.5}
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--teal-ink);font-weight:600;font-size:.9rem;margin-top:16px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOCK / SETUP ============ -->
+<div id="lockView">
+  <div class="lock-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4.5-6 3.5 4 4-7 6 9"/></svg></div>
+  <h1 id="lockTitle">Blood Trends</h1>
+  <p class="sub" id="lockSub">Enter your PIN to unlock.</p>
+  <input class="pin-field" id="pin1" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••">
+  <input class="pin-field hidden" id="pin2" type="password" inputmode="numeric" autocomplete="off" placeholder="Confirm PIN">
+  <p class="err" id="lockErr"></p>
+  <button class="btn btn-primary" id="lockBtn">Unlock</button>
+  <p class="disclaimer" style="text-align:center">All data is encrypted and stored only on this device.<br>This app is for personal record-keeping and is not medical advice — always discuss results with your doctor.</p>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell" class="hidden">
+<header class="app"><div class="bar">
+  <div class="brand">Blood Trends<small>Personal pathology ledger</small></div>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙︎</button>
+  <button class="icon-btn" id="lockNowBtn" aria-label="Lock">🔒</button>
+</div></header>
+<div class="wrap">
+
+  <!-- HOME -->
+  <section id="homeView">
+    <h1>Your markers</h1>
+    <p class="sub" id="homeSummary"></p>
+    <div style="margin-top:14px"><button class="btn btn-primary" id="uploadBtn">＋ &nbsp;Add a blood test report (PDF)</button></div>
+    <div class="marker-grid" id="markerGrid"></div>
+    <p class="disclaimer">Reference ranges shown are typical UK adult guide values. Your laboratory's own ranges, printed on each report, always take precedence. Flags here are informational only — decisions belong in a conversation with your doctor.</p>
+  </section>
+
+  <!-- UPLOAD / REVIEW -->
+  <section id="uploadView" class="hidden">
+    <button class="back" id="upBack">‹ Back</button>
+    <h1>Add report</h1>
+    <div id="upStep1">
+      <p class="sub">Choose a blood test PDF. It is read entirely on this device — nothing is uploaded anywhere.</p>
+      <div class="card">
+        <input type="file" id="pdfFile" accept="application/pdf" style="font-size:.9rem">
+        <p class="progress hidden" id="upProgress"></p>
+      </div>
+    </div>
+    <div id="upStep2" class="hidden">
+      <p class="sub">Check the values below against the PDF. Correct anything the reader misjudged, remove wrong rows, or add missing ones — then save.</p>
+      <div class="card">
+        <h2>Test date</h2>
+        <input type="date" id="revDate">
+        <h2 style="margin-top:18px">Detected results <span class="badge-new" id="revCount"></span></h2>
+        <div id="revRows"></div>
+        <button class="btn btn-ghost btn-small" id="revAdd">＋ Add a row</button>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary" id="revSave">Save to my records</button>
+        <button class="btn btn-ghost" id="revCancel">Discard</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKER DETAIL -->
+  <section id="detailView" class="hidden">
+    <button class="back" id="detBack">‹ All markers</button>
+    <h1 id="detName"></h1>
+    <p class="range-note" id="detRange"></p>
+    <div class="card chart-box" id="detChart"></div>
+    <div class="card">
+      <h2>History</h2>
+      <div class="hist" id="detHist"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settingsView" class="hidden">
+    <button class="back" id="setBack">‹ Back</button>
+    <h1>Settings</h1>
+
+    <p class="eyebrow">Backup</p>
+    <div class="card">
+      <div class="set-row"><div><div>Export my data</div><div class="set-sub">Saves an unencrypted JSON file. Store it somewhere safe (e.g. a protected folder). Do this after each new report.</div></div>
+        <button class="btn btn-ghost btn-small" id="exportBtn">Export</button></div>
+      <div class="set-row"><div><div>Import a backup</div><div class="set-sub">Merges a previously exported file into this device.</div></div>
+        <button class="btn btn-ghost btn-small" id="importBtn">Import</button></div>
+      <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    </div>
+
+    <p class="eyebrow">Reports on this device</p>
+    <div class="card" id="reportsList"></div>
+
+    <p class="eyebrow">Security</p>
+    <div class="card">
+      <div class="set-row"><div><div>Change PIN</div><div class="set-sub">Re-encrypts everything under the new PIN.</div></div>
+        <button class="btn btn-ghost btn-small" id="changePinBtn">Change</button></div>
+      <div class="set-row"><div><div>Erase everything</div><div class="set-sub">Deletes all data and the PIN from this device. Cannot be undone.</div></div>
+        <button class="btn btn-danger btn-small" id="wipeBtn">Erase</button></div>
+    </div>
+
+    <p class="eyebrow">About</p>
+    <div class="card"><p class="sub">Blood Trends v1 · All records are AES-256-GCM encrypted with a key derived from your PIN (PBKDF2, 310,000 iterations) and stored only in this device's browser storage. The hosted site serves code only; no data ever leaves your phone. If you forget your PIN there is no recovery — restore from an exported backup instead.</p></div>
+  </section>
+
+</div>
+</div>
+
+<script>
+"use strict";
+/* =================================================================
+   Blood Trends — single-file PWA. All logic below runs on-device.
+   ================================================================= */
+
+/* ---------------- Marker dictionary (typical UK adult guide ranges) ---------------- */
+/* Order matters: more specific aliases first (e.g. HbA1c before Haemoglobin). */
+/*PARSE-START*/
+const MARKERS = [
+ {id:"hba1c",   name:"HbA1c",               unit:"mmol/mol", low:20,  high:41,  aliases:["hba1c","hb a1c","glycated haemoglobin","glycated hemoglobin","haemoglobin a1c","hemoglobin a1c","a1c"]},
+ {id:"glucose", name:"Glucose (fasting)",   unit:"mmol/L",   low:3.5, high:5.4, aliases:["fasting glucose","glucose fasting","plasma glucose","blood glucose","glucose"]},
+ {id:"cholr",   name:"Chol : HDL ratio",    unit:"ratio",    low:null,high:4.5, aliases:["cholesterol/hdl","chol/hdl","tc/hdl","hdl ratio","cholesterol hdl ratio"]},
+ {id:"nonhdl",  name:"Non-HDL cholesterol", unit:"mmol/L",   low:null,high:4.0, aliases:["non-hdl cholesterol","non hdl cholesterol","non-hdl","non hdl"]},
+ {id:"hdl",     name:"HDL cholesterol",     unit:"mmol/L",   low:1.0, high:null,aliases:["hdl cholesterol","hdl-c","hdl"]},
+ {id:"ldl",     name:"LDL cholesterol",     unit:"mmol/L",   low:null,high:3.0, aliases:["ldl cholesterol","ldl-c","ldl"]},
+ {id:"tchol",   name:"Total cholesterol",   unit:"mmol/L",   low:null,high:5.0, aliases:["total cholesterol","serum cholesterol","cholesterol"]},
+ {id:"trig",    name:"Triglycerides",       unit:"mmol/L",   low:null,high:1.7, aliases:["triglycerides","triglyceride"]},
+ {id:"vitd",    name:"Vitamin D",           unit:"nmol/L",   low:50,  high:250, aliases:["25-oh vitamin d","25 oh vitamin d","25-hydroxyvitamin d","vitamin d"]},
+ {id:"b12",     name:"Vitamin B12",         unit:"ng/L",     low:197, high:771, aliases:["vitamin b12","cobalamin","b12"]},
+ {id:"folate",  name:"Folate",              unit:"µg/L",     low:3.9, high:26.8,aliases:["folate","folic acid"]},
+ {id:"ferritin",name:"Ferritin",            unit:"µg/L",     low:30,  high:400, aliases:["ferritin"]},
+ {id:"tsh",     name:"TSH",                 unit:"mU/L",     low:0.27,high:4.2, aliases:["thyroid stimulating hormone","tsh"]},
+ {id:"alt",     name:"ALT",                 unit:"U/L",      low:null,high:41,  aliases:["alanine transaminase","alanine aminotransferase","alt"]},
+ {id:"ast",     name:"AST",                 unit:"U/L",      low:null,high:40,  aliases:["aspartate transaminase","aspartate aminotransferase","ast"]},
+ {id:"ggt",     name:"Gamma GT",            unit:"U/L",      low:null,high:60,  aliases:["gamma-glutamyl transferase","gamma gt","ggt"]},
+ {id:"alp",     name:"ALP",                 unit:"U/L",      low:30,  high:130, aliases:["alkaline phosphatase","alk phos","alp"]},
+ {id:"bili",    name:"Bilirubin",           unit:"µmol/L",   low:null,high:21,  aliases:["total bilirubin","bilirubin"]},
+ {id:"alb",     name:"Albumin",             unit:"g/L",      low:35,  high:50,  aliases:["albumin"]},
+ {id:"creat",   name:"Creatinine",          unit:"µmol/L",   low:59,  high:104, aliases:["creatinine"]},
+ {id:"egfr",    name:"eGFR",                unit:"mL/min",   low:90,  high:null,aliases:["estimated gfr","egfr","gfr"]},
+ {id:"urea",    name:"Urea",                unit:"mmol/L",   low:2.5, high:7.8, aliases:["urea"]},
+ {id:"na",      name:"Sodium",              unit:"mmol/L",   low:133, high:146, aliases:["sodium"]},
+ {id:"k",       name:"Potassium",           unit:"mmol/L",   low:3.5, high:5.3, aliases:["potassium"]},
+ {id:"crp",     name:"CRP",                 unit:"mg/L",     low:null,high:5,   aliases:["c-reactive protein","c reactive protein","crp"]},
+ {id:"hb",      name:"Haemoglobin",         unit:"g/L",      low:130, high:180, aliases:["haemoglobin","hemoglobin"]},
+ {id:"wbc",     name:"White cell count",    unit:"10⁹/L",    low:4.0, high:11.0,aliases:["white cell count","white blood cell","wbc"]},
+ {id:"plt",     name:"Platelets",           unit:"10⁹/L",    low:150, high:410, aliases:["platelet count","platelets","platelet"]}
+];
+function markerById(id, custom){ return MARKERS.find(m=>m.id===id) || (custom&&custom[id]?{id, name:custom[id].name, unit:custom[id].unit||"", low:null, high:null}:null); }
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\\/-]/g,"\\$&"); }
+
+/* Extract {markerId, value} candidates from an array of text lines */
+function parseLines(lines){
+  const found = {};
+  for(const raw of lines){
+    const line = raw.toLowerCase();
+    for(const m of MARKERS){
+      if(found[m.id]!==undefined) continue;
+      let hit=null;
+      for(const a of m.aliases){
+        const re = new RegExp("(^|[^a-z0-9])"+escRe(a)+"([^a-z0-9]|$)");
+        const mt = re.exec(line);
+        if(mt){ hit = mt.index + mt[1].length + a.length; break; }
+      }
+      if(hit===null) continue;
+      let tail = line.slice(hit);
+      let num = /[<>]?\s*(\d+(?:\.\d+)?)/.exec(tail);
+      if(!num) num = /[<>]?\s*(\d+(?:\.\d+)?)/.exec(line); // value printed before the name
+      if(num){
+        const v = parseFloat(num[1]);
+        if(isFinite(v) && v < 100000){ found[m.id]=v; break; } // one marker per line
+      }
+    }
+  }
+  return Object.entries(found).map(([id,value])=>({id,value}));
+}
+
+/* Find the most plausible sample date in the text; returns "YYYY-MM-DD" or null */
+function parseDate(lines){
+  const months={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const iso = (y,mo,d)=>{ y=+y; mo=+mo; d=+d; if(y<100) y+=2000;
+    if(y<2000||y>2100||mo<1||mo>12||d<1||d>31) return null;
+    return y+"-"+String(mo).padStart(2,"0")+"-"+String(d).padStart(2,"0"); };
+  const collected=[], keyworded=[], plain=[];
+  const datesIn = line => {
+    const out=[]; let m;
+    const numRe = /(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/g;
+    while((m=numRe.exec(line))){ const d=iso(m[3],m[2],m[1]); if(d) out.push(d); }
+    const isoRe = /(\d{4})-(\d{2})-(\d{2})/g;
+    while((m=isoRe.exec(line))){ const d=iso(m[1],m[2],m[3]); if(d) out.push(d); }
+    const wordRe = /(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4})/g;
+    while((m=wordRe.exec(line))){ const d=iso(m[3],months[m[2]],m[1]); if(d) out.push(d); }
+    return out;
+  };
+  for(const raw of lines){
+    const line = raw.toLowerCase();
+    if(/(birth|d\.?o\.?b)/.test(line)) continue;              // never use a date of birth
+    const ds = datesIn(line); if(!ds.length) continue;
+    if(/(collect|sample|taken|test date|date of test)/.test(line)) collected.push(ds[0]); // first date on the line
+    else if(/(received|report)/.test(line)) keyworded.push(...ds);
+    else plain.push(...ds);
+  }
+  const today = new Date().toISOString().slice(0,10);
+  const ok = arr => arr.filter(d=>d<=today);
+  const co = ok(collected); if(co.length) return co[0];
+  const kw = ok(keyworded); if(kw.length) return kw.sort().reverse()[0];
+  const pl = ok(plain);     if(pl.length) return pl.sort().reverse()[0];
+  return null;
+}
+
+/* Trend for a value series (oldest→newest): compares latest with mean of up to 3 prior */
+function trendOf(values){
+  if(values.length<2) return null;
+  const last = values[values.length-1];
+  const prior = values.slice(Math.max(0,values.length-4), values.length-1);
+  const mean = prior.reduce((a,b)=>a+b,0)/prior.length;
+  if(mean===0) return "steady";
+  const pct = (last-mean)/Math.abs(mean)*100;
+  if(pct>7) return "up";
+  if(pct<-7) return "down";
+  return "steady";
+}
+function flagOf(v,m){ if(m.low!=null && v<m.low) return "LOW"; if(m.high!=null && v>m.high) return "HIGH"; return null; }
+/*PARSE-END*/
+
+/* ---------------- Crypto (Web Crypto API) ---------------- */
+const enc=new TextEncoder(), dec=new TextDecoder();
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function deriveKey(pin,salt){
+  const base=await crypto.subtle.importKey("raw",enc.encode(pin),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:310000,hash:"SHA-256"},base,
+    {name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+async function encJSON(key,obj){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc.encode(JSON.stringify(obj)));
+  return JSON.stringify({iv:b64(iv),ct:b64(ct)});
+}
+async function decJSON(key,str){
+  const {iv,ct}=JSON.parse(str);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(iv)},key,unb64(ct));
+  return JSON.parse(dec.decode(pt));
+}
+
+/* ---------------- State & storage ---------------- */
+const LS={salt:"bt_salt",check:"bt_check",data:"bt_data"};
+let KEY=null, DATA=null, hiddenAt=null;
+const AUTOLOCK_MS = 3*60*1000;
+const emptyData=()=>({records:[],custom:{}});
+
+async function persist(){ localStorage.setItem(LS.data, await encJSON(KEY,DATA)); }
+function isSetup(){ return !!localStorage.getItem(LS.salt); }
+
+/* ---------------- Tiny helpers ---------------- */
+const $=id=>document.getElementById(id);
+function show(viewId){
+  for(const v of["homeView","uploadView","detailView","settingsView"]) $(v).classList.toggle("hidden",v!==viewId);
+  window.scrollTo(0,0);
+}
+function toast(msg){
+  const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate=d=>{ const [y,m,dd]=d.split("-"); return dd+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]+" "+y; };
+
+/* Series for a marker: [{date,value}] oldest→newest */
+function seriesFor(id){
+  const pts=[];
+  for(const r of DATA.records) for(const v of r.values) if(v.id===id) pts.push({date:r.date,value:v.value,rec:r.rid});
+  return pts.sort((a,b)=>a.date<b.date?-1:1);
+}
+
+/* ---------------- Lock screen flow ---------------- */
+function initLockUI(){
+  const setup=!isSetup();
+  $("lockTitle").textContent = setup? "Welcome" : "Blood Trends";
+  $("lockSub").textContent = setup? "Choose a PIN (at least 6 digits). It encrypts everything — there is no recovery if forgotten." : "Enter your PIN to unlock.";
+  $("pin2").classList.toggle("hidden",!setup);
+  $("lockBtn").textContent = setup? "Create PIN & start" : "Unlock";
+  $("pin1").value=""; $("pin2").value=""; $("lockErr").textContent="";
+}
+async function onLockBtn(){
+  const p1=$("pin1").value.trim(), p2=$("pin2").value.trim(), errEl=$("lockErr");
+  errEl.textContent="";
+  try{
+    if(!isSetup()){
+      if(p1.length<6){ errEl.textContent="PIN must be at least 6 digits."; return; }
+      if(p1!==p2){ errEl.textContent="PINs do not match."; return; }
+      const salt=crypto.getRandomValues(new Uint8Array(16));
+      localStorage.setItem(LS.salt,b64(salt));
+      KEY=await deriveKey(p1,salt);
+      localStorage.setItem(LS.check, await encJSON(KEY,{ok:true}));
+      DATA=emptyData(); await persist();
+    }else{
+      const salt=unb64(localStorage.getItem(LS.salt));
+      const key=await deriveKey(p1,salt);
+      try{ await decJSON(key,localStorage.getItem(LS.check)); }
+      catch(e){ errEl.textContent="Incorrect PIN."; return; }
+      KEY=key;
+      const blob=localStorage.getItem(LS.data);
+      DATA = blob? await decJSON(KEY,blob) : emptyData();
+    }
+    $("lockView").classList.add("hidden");
+    $("appShell").classList.remove("hidden");
+    renderHome(); show("homeView");
+  }catch(e){ errEl.textContent="Something went wrong: "+e.message; }
+}
+function lockNow(){
+  KEY=null; DATA=null;
+  $("appShell").classList.add("hidden");
+  $("lockView").classList.remove("hidden");
+  initLockUI();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ hiddenAt=Date.now(); }
+  else if(hiddenAt && KEY && Date.now()-hiddenAt>AUTOLOCK_MS){ lockNow(); }
+});
+
+/* ---------------- Home ---------------- */
+function renderHome(){
+  const grid=$("markerGrid"); grid.innerHTML="";
+  const ids=[...MARKERS.map(m=>m.id),...Object.keys(DATA.custom)];
+  let shown=0, latest=null;
+  for(const r of DATA.records) if(!latest||r.date>latest) latest=r.date;
+  for(const id of ids){
+    const s=seriesFor(id); if(!s.length) continue;
+    const m=markerById(id,DATA.custom); shown++;
+    const last=s[s.length-1], fl=flagOf(last.value,m), tr=trendOf(s.map(p=>p.value));
+    const arrows={up:"▲",down:"▼",steady:"—"}, words={up:"Rising",down:"Falling",steady:"Steady"};
+    const btn=document.createElement("button");
+    btn.className="marker-card";
+    btn.innerHTML=`<div><div class="mc-name">${esc(m.name)}</div>
+      <div class="mc-range">${rangeText(m)}</div>
+      ${tr?`<span class="trend-chip ${tr}"><span class="arr">${arrows[tr]}</span>${words[tr]}</span>`:""}</div>
+      <div class="mc-value"><div class="v ${fl?"flag":""}">${last.value}${fl?" ⚑":""}</div>
+      <div class="u">${esc(m.unit||"")} · ${fmtDate(last.date)}</div></div>`;
+    btn.addEventListener("click",()=>openDetail(id));
+    grid.appendChild(btn);
+  }
+  $("homeSummary").textContent = DATA.records.length
+    ? `${DATA.records.length} report${DATA.records.length>1?"s":""} on file · latest ${fmtDate(latest)}`
+    : "";
+  if(!shown) grid.innerHTML=`<div class="empty">No results yet.<br>Add your first blood test PDF above — everything stays on this phone.</div>`;
+}
+function rangeText(m){
+  if(m.low!=null&&m.high!=null) return `guide ${m.low}–${m.high} ${m.unit||""}`;
+  if(m.high!=null) return `guide &lt; ${m.high} ${m.unit||""}`;
+  if(m.low!=null) return `guide &gt; ${m.low} ${m.unit||""}`;
+  return "no guide range";
+}
+
+/* ---------------- Detail + chart ---------------- */
+let currentDetail=null;
+function openDetail(id){
+  currentDetail=id;
+  const m=markerById(id,DATA.custom), s=seriesFor(id);
+  $("detName").textContent=m.name;
+  $("detRange").innerHTML=`${esc(m.unit||"")} · ${rangeText(m)} — lab ranges on your report take precedence`;
+  $("detChart").innerHTML=chartSVG(s,m);
+  const h=$("detHist"); h.innerHTML="";
+  for(const p of [...s].reverse()){
+    const fl=flagOf(p.value,m);
+    const row=document.createElement("div"); row.className="hist-row";
+    row.innerHTML=`<span class="hist-date">${fmtDate(p.date)}</span>
+      <span class="hist-val">${p.value} <small style="color:var(--muted);font-weight:400">${esc(m.unit||"")}</small></span>
+      ${fl?`<span class="hist-flag">${fl}</span>`:""}
+      <button class="hist-del" aria-label="Delete this value">remove</button>`;
+    row.querySelector(".hist-del").addEventListener("click",async()=>{
+      if(!confirm(`Remove the ${fmtDate(p.date)} value for ${m.name}?`)) return;
+      const rec=DATA.records.find(r=>r.rid===p.rec);
+      rec.values=rec.values.filter(v=>v.id!==id);
+      DATA.records=DATA.records.filter(r=>r.values.length);
+      await persist(); toast("Removed");
+      seriesFor(id).length? openDetail(id):(renderHome(),show("homeView"));
+    });
+    h.appendChild(row);
+  }
+  show("detailView");
+}
+function chartSVG(s,m){
+  const W=340,H=200,P={t:18,r:14,b:26,l:40};
+  if(s.length===1){
+    return `<svg viewBox="0 0 ${W} 80" role="img"><text x="${W/2}" y="40" text-anchor="middle" fill="#5B6B73" font-size="12" font-family="var(--sans)">One result so far (${s[0].value} ${esc(m.unit||"")}) — a trend line appears from your second report.</text></svg>`;
+  }
+  const xs=s.map(p=>new Date(p.date).getTime()), ys=s.map(p=>p.value);
+  let lo=Math.min(...ys), hi=Math.max(...ys);
+  const spread=(hi-lo)||Math.abs(hi)||1;
+  // include guide bounds when they are near the data, so the band is visible but doesn't flatten the line
+  const nearLo=m.low!=null && m.low>lo-spread*1.5 && m.low<hi+spread*1.5;
+  const nearHi=m.high!=null && m.high>lo-spread*1.5 && m.high<hi+spread*1.5;
+  if(nearLo) lo=Math.min(lo,m.low); if(nearHi) hi=Math.max(hi,m.high);
+  const pad=(hi-lo)*0.15||1; lo-=pad; hi+=pad;
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  const X=t=>P.l+(t-x0)/((x1-x0)||1)*(W-P.l-P.r);
+  const Y=v=>H-P.b-(v-lo)/(hi-lo)*(H-P.t-P.b);
+  let g="";
+  // in-range band
+  const bLo=m.low!=null?Math.max(m.low,lo):lo, bHi=m.high!=null?Math.min(m.high,hi):hi;
+  if((m.low!=null||m.high!=null)&&bHi>bLo)
+    g+=`<rect x="${P.l}" y="${Y(bHi)}" width="${W-P.l-P.r}" height="${Y(bLo)-Y(bHi)}" fill="rgba(14,116,144,.08)"/>`;
+  if(nearHi) g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${Y(m.high)}" y2="${Y(m.high)}" stroke="#0E7490" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-P.r}" y="${Y(m.high)-4}" text-anchor="end" font-size="9" fill="#0B5C73">high ${m.high}</text>`;
+  if(nearLo) g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${Y(m.low)}" y2="${Y(m.low)}" stroke="#0E7490" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-P.r}" y="${Y(m.low)+11}" text-anchor="end" font-size="9" fill="#0B5C73">low ${m.low}</text>`;
+  // axis labels
+  g+=`<text x="4" y="${Y(hi-pad)+3}" font-size="9" fill="#5B6B73">${round2(hi-pad)}</text>`;
+  g+=`<text x="4" y="${Y(lo+pad)+3}" font-size="9" fill="#5B6B73">${round2(lo+pad)}</text>`;
+  // line + dots
+  const path=s.map((p,i)=>(i?"L":"M")+X(new Date(p.date).getTime()).toFixed(1)+" "+Y(p.value).toFixed(1)).join(" ");
+  g+=`<path d="${path}" fill="none" stroke="#0E7490" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  for(const p of s){
+    const fl=flagOf(p.value,m);
+    g+=`<circle cx="${X(new Date(p.date).getTime()).toFixed(1)}" cy="${Y(p.value).toFixed(1)}" r="4" fill="${fl?"#B3261E":"#0E7490"}"/>`;
+  }
+  // last value label
+  const lp=s[s.length-1];
+  g+=`<text x="${Math.min(X(new Date(lp.date).getTime()),W-P.r-4)}" y="${Y(lp.value)-9}" text-anchor="end" font-size="10" font-weight="700" fill="#16262E" font-family="ui-monospace,monospace">${lp.value}</text>`;
+  // x labels first/last
+  g+=`<text x="${P.l}" y="${H-6}" font-size="9" fill="#5B6B73">${fmtDate(s[0].date)}</text>`;
+  g+=`<text x="${W-P.r}" y="${H-6}" text-anchor="end" font-size="9" fill="#5B6B73">${fmtDate(lp.date)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trend chart">${g}</svg>`;
+}
+const round2=n=>Math.round(n*100)/100;
+
+/* ---------------- Upload & review ---------------- */
+let pdfjsReady=null;
+function loadPdfJs(){
+  if(pdfjsReady) return pdfjsReady;
+  pdfjsReady=new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; res(window.pdfjsLib); };
+    s.onerror=()=>rej(new Error("Could not load the PDF reader. Check your internet connection and try again."));
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+async function pdfToLines(file){
+  const lib=await loadPdfJs();
+  const buf=await file.arrayBuffer();
+  const pdf=await lib.getDocument({data:buf}).promise;
+  const lines=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    const rows={};
+    for(const it of tc.items){
+      const y=Math.round(it.transform[5]/3)*3; // group items on ~same baseline
+      (rows[y]=rows[y]||[]).push({x:it.transform[4],str:it.str});
+    }
+    const ys=Object.keys(rows).map(Number).sort((a,b)=>b-a);
+    for(const y of ys) lines.push(rows[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(" "));
+  }
+  return lines;
+}
+let pendingSource="";
+$("pdfFile").addEventListener("change",async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const prog=$("upProgress"); prog.classList.remove("hidden"); prog.textContent="Reading PDF on this device…";
+  try{
+    const lines=await pdfToLines(file);
+    prog.textContent="Looking for blood markers…";
+    const cands=parseLines(lines);
+    const date=parseDate(lines);
+    pendingSource=file.name;
+    buildReview(cands,date);
+    $("upStep1").classList.add("hidden");
+    $("upStep2").classList.remove("hidden");
+  }catch(err){
+    prog.textContent="";
+    alert("Could not read that PDF: "+err.message+"\n\nIf it is a scanned image rather than a text PDF, add the values manually via ＋ Add a row.");
+    buildReview([],null); pendingSource=file.name||"manual entry";
+    $("upStep1").classList.add("hidden"); $("upStep2").classList.remove("hidden");
+  }finally{ e.target.value=""; prog.classList.add("hidden"); }
+});
+function markerOptions(sel){
+  let o=MARKERS.map(m=>`<option value="${m.id}" ${m.id===sel?"selected":""}>${esc(m.name)}</option>`).join("");
+  for(const[id,c]of Object.entries(DATA.custom)) o+=`<option value="${id}" ${id===sel?"selected":""}>${esc(c.name)}</option>`;
+  o+=`<option value="__custom" ${sel==="__custom"?"selected":""}>Custom marker…</option>`;
+  return o;
+}
+function addReviewRow(id,value){
+  const m=id&&id!=="__custom"?markerById(id,DATA.custom):null;
+  const row=document.createElement("div"); row.className="rev-row";
+  row.innerHTML=`<select class="mk">${markerOptions(id||MARKERS[0].id)}</select>
+    <input class="val" type="text" inputmode="decimal" value="${value!=null?value:""}" placeholder="value">
+    <button class="rm" aria-label="Remove row">✕</button>
+    <div class="rev-custom"><input class="cname" type="text" placeholder="Marker name (e.g. Magnesium)" style="margin-bottom:6px">
+    <input class="cunit" type="text" placeholder="Unit (e.g. mmol/L)"></div>`;
+  const sel=row.querySelector(".mk"), cust=row.querySelector(".rev-custom");
+  sel.addEventListener("change",()=>{ cust.style.display = sel.value==="__custom"?"block":"none"; });
+  row.querySelector(".rm").addEventListener("click",()=>{ row.remove(); updateRevCount(); });
+  $("revRows").appendChild(row);
+}
+function updateRevCount(){ const n=$("revRows").children.length; $("revCount").textContent=n+" row"+(n===1?"":"s"); }
+function buildReview(cands,date){
+  $("revRows").innerHTML="";
+  for(const c of cands) addReviewRow(c.id,c.value);
+  updateRevCount();
+  $("revDate").value = date || new Date().toISOString().slice(0,10);
+  if(!cands.length) toast("No markers auto-detected — add rows manually");
+}
+$("revAdd").addEventListener("click",()=>{ addReviewRow(null,null); updateRevCount(); });
+$("revSave").addEventListener("click",async()=>{
+  const date=$("revDate").value;
+  if(!date){ alert("Please set the test date."); return; }
+  const values=[]; const seen={};
+  for(const row of $("revRows").children){
+    let id=row.querySelector(".mk").value;
+    const v=parseFloat(row.querySelector(".val").value);
+    if(!isFinite(v)) continue;
+    if(id==="__custom"){
+      const name=row.querySelector(".cname").value.trim();
+      if(!name) continue;
+      id="c_"+name.toLowerCase().replace(/[^a-z0-9]+/g,"_");
+      DATA.custom[id]={name, unit:row.querySelector(".cunit").value.trim()};
+    }
+    if(!seen[id]){ seen[id]=true; values.push({id,value:v}); }
+  }
+  if(!values.length){ alert("No valid values to save — each row needs a marker and a number."); return; }
+  let rec=DATA.records.find(r=>r.date===date);
+  if(rec){
+    if(!confirm("A report dated "+fmtDate(date)+" already exists. Merge these values into it?")) return;
+    for(const nv of values){ rec.values=rec.values.filter(v=>v.id!==nv.id); rec.values.push(nv); }
+    rec.source+= " + "+pendingSource;
+  }else{
+    rec={rid:"r"+Date.now(), date, source:pendingSource, values};
+    DATA.records.push(rec);
+    DATA.records.sort((a,b)=>a.date<b.date?-1:1);
+  }
+  await persist();
+  toast("Saved — "+values.length+" values on "+fmtDate(date));
+  renderHome(); show("homeView");
+  resetUpload();
+});
+$("revCancel").addEventListener("click",()=>{ resetUpload(); show("homeView"); });
+function resetUpload(){ $("upStep1").classList.remove("hidden"); $("upStep2").classList.add("hidden"); $("revRows").innerHTML=""; }
+
+/* ---------------- Settings ---------------- */
+function renderSettings(){
+  const box=$("reportsList"); box.innerHTML="";
+  if(!DATA.records.length){ box.innerHTML=`<p class="sub">No reports stored yet.</p>`; return; }
+  for(const r of [...DATA.records].reverse()){
+    const row=document.createElement("div"); row.className="set-row";
+    row.innerHTML=`<div><div>${fmtDate(r.date)} · ${r.values.length} values</div>
+      <div class="report-src">${esc(r.source||"")}</div></div>
+      <button class="btn btn-danger btn-small">Delete</button>`;
+    row.querySelector("button").addEventListener("click",async()=>{
+      if(!confirm("Delete the whole report from "+fmtDate(r.date)+"?")) return;
+      DATA.records=DATA.records.filter(x=>x.rid!==r.rid);
+      await persist(); renderSettings(); toast("Report deleted");
+    });
+    box.appendChild(row);
+  }
+}
+$("exportBtn").addEventListener("click",async()=>{
+  const payload=JSON.stringify({app:"blood-trends",version:1,exportedAt:new Date().toISOString(),data:DATA},null,2);
+  const file=new File([payload],"blood-trends-backup-"+new Date().toISOString().slice(0,10)+".json",{type:"application/json"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:"Blood Trends backup"}); return; }catch(e){ if(e.name==="AbortError") return; }
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const obj=JSON.parse(await f.text());
+    if(!obj||obj.app!=="blood-trends"||!obj.data) throw new Error("not a Blood Trends backup");
+    let added=0;
+    Object.assign(DATA.custom,obj.data.custom||{});
+    for(const r of obj.data.records||[]){
+      const ex=DATA.records.find(x=>x.date===r.date);
+      if(ex){ for(const nv of r.values){ if(!ex.values.find(v=>v.id===nv.id)){ ex.values.push(nv); added++; } } }
+      else{ DATA.records.push(r); added+=r.values.length; }
+    }
+    DATA.records.sort((a,b)=>a.date<b.date?-1:1);
+    await persist(); renderSettings(); toast("Imported — "+added+" values merged");
+  }catch(err){ alert("Import failed: "+err.message); }
+  finally{ e.target.value=""; }
+});
+$("changePinBtn").addEventListener("click",async()=>{
+  const cur=prompt("Current PIN:"); if(cur==null) return;
+  try{
+    const salt=unb64(localStorage.getItem(LS.salt));
+    const key=await deriveKey(cur,salt);
+    await decJSON(key,localStorage.getItem(LS.check));
+  }catch(e){ alert("Incorrect current PIN."); return; }
+  const p1=prompt("New PIN (at least 6 digits):"); if(p1==null) return;
+  if(p1.trim().length<6){ alert("PIN must be at least 6 digits."); return; }
+  const p2=prompt("Confirm new PIN:"); if(p2!==p1){ alert("PINs do not match."); return; }
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  localStorage.setItem(LS.salt,b64(salt));
+  KEY=await deriveKey(p1.trim(),salt);
+  localStorage.setItem(LS.check,await encJSON(KEY,{ok:true}));
+  await persist();
+  toast("PIN changed — data re-encrypted");
+});
+$("wipeBtn").addEventListener("click",()=>{
+  if(!confirm("Erase ALL data and the PIN from this device? Exported backups are not affected.")) return;
+  if(!confirm("Absolutely sure? This cannot be undone.")) return;
+  localStorage.removeItem(LS.salt); localStorage.removeItem(LS.check); localStorage.removeItem(LS.data);
+  lockNow(); toast("Everything erased");
+});
+
+/* ---------------- Navigation wiring ---------------- */
+$("lockBtn").addEventListener("click",onLockBtn);
+$("pin1").addEventListener("keydown",e=>{ if(e.key==="Enter"){ isSetup()? onLockBtn() : $("pin2").focus(); } });
+$("pin2").addEventListener("keydown",e=>{ if(e.key==="Enter") onLockBtn(); });
+$("lockNowBtn").addEventListener("click",lockNow);
+$("settingsBtn").addEventListener("click",()=>{ renderSettings(); show("settingsView"); });
+$("setBack").addEventListener("click",()=>{ renderHome(); show("homeView"); });
+$("uploadBtn").addEventListener("click",()=>{ resetUpload(); show("uploadView"); });
+$("upBack").addEventListener("click",()=>{ resetUpload(); show("homeView"); });
+$("detBack").addEventListener("click",()=>{ renderHome(); show("homeView"); });
+
+/* ---------------- Boot ---------------- */
+initLockUI();
+if(!window.isSecureContext){
+  $("lockErr").textContent="This app needs a secure (https) address for encryption to work.";
+  $("lockBtn").disabled=true;
+}
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("./sw.js").catch(()=>{}); }
+</script>
+</body>
+</html>
