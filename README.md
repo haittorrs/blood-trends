@@ -151,26 +151,13 @@ A synthetic file named `sample-report.pdf` is included for testing.
 
 The sample report contains no real patient data.
 
-## Deployment with GitHub Pages
+## Installing as an app
 
-1. Create a GitHub repository.
-2. Upload all required project files.
-3. Open the repository's **Settings**.
-4. Select **Pages**.
-5. Under **Build and deployment**, choose **Deploy from a branch**.
-6. Select the `main` branch and the `/ (root)` folder.
-7. Save the settings.
-8. Wait for GitHub Pages to publish the site.
-
-The deployed address will normally follow this format:
+The deployed address for this project is currently:
 
 ```text
-https://YOUR-USERNAME.github.io/REPOSITORY-NAME/
+[https://haittorrs.github.io/blood-trends/](haittorrs.github.io/blood-trends)
 ```
-
-GitHub Pages provides HTTPS, which is required for browser encryption and service workers outside `localhost`.
-
-## Installing as an app
 
 ### iPhone or iPad
 
@@ -252,3 +239,9 @@ Without a licence, the repository remains protected by default copyright law. Ad
 Blood Trends is intended only for personal record keeping and trend visualisation.
 
 It does not diagnose conditions, interpret results medically, recommend treatments, or replace professional medical advice. Always consult a qualified healthcare professional about blood test results or health concerns.
+
+## Future development
+
+Future updates to the app may include:
+- OCR support for scanning physical blood test reports.
+- A graph function to visually display the trends in blood markers over time.
